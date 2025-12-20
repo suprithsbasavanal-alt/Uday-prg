@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>We Five - Karnataka Traffic & Road Safety</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Notification Toast -->
+    <div id="notification-container"></div>
+
+    <!-- Navigation Menu (Top Left) -->
+    <div id="menu-container" class="hidden">
+        <button id="menu-btn" aria-label="Menu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+        <nav id="sidebar" class="glass-panel">
+            <div class="sidebar-header">
+                <h2>Menu</h2>
+                <button id="close-menu-btn"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <ul class="menu-list">
+                <li onclick="navigateTo('map-page')"><i class="fa-solid fa-map"></i> Live Map</li>
+                <li onclick="navigateTo('traffic-report-page')"><i class="fa-solid fa-traffic-light"></i> Report Traffic
+                </li>
+                <li onclick="navigateTo('pothole-report-page')"><i class="fa-solid fa-road"></i> Report Pothole</li>
+                <li onclick="navigateTo('echalan-page')"><i class="fa-solid fa-file-invoice-dollar"></i> E-Challan</li>
+            </ul>
+        </nav>
+    </div>
+
+    <!-- Admin Portal Button (Top Right) -->
+    <div id="admin-btn-container" class="hidden">
+        <button id="admin-btn" onclick="requestAdminAccess()" aria-label="Admin Portal">
+            <i class="fa-solid fa-user-shield"></i>
+        </button>
+    </div>
+
+    <!-- Main Content Area -->
+    <main id="app">
+
+        <!-- 1. Landing Page -->
+        <section id="landing-page" class="active-page">
+            <div class="landing-content">
+                <h1 class="fade-in-up">we five</h1>
+                <p class="fade-in-up delay-1">Karnataka's Road Safety Companion</p>
+                <button class="primary-btn fade-in-up delay-2" onclick="enterApp()">Get Started</button>
+            </div>
+        </section>
+
+        <!-- 2. Map Page -->
+        <section id="map-page" class="page hidden">
+            <div id="map"></div>
+
+            <div class="map-controls glass-panel">
+                <h3>Live Navigation</h3>
+                <div class="input-group">
+                    <input type="text" id="current-location" placeholder="Detecting Location..." readonly>
+                    <button class="icon-btn" onclick="detectLocation()"><i class="fa-solid fa-crosshairs"></i></button>
+                </div>
+                <div class="input-group">
+                    <input type="text" id="destination" placeholder="Enter Destination" autocomplete="off">
+                    <ul id="suggestions-list" class="suggestions-list hidden"></ul>
+                </div>
+                <button class="primary-btn full-width" onclick="calculateRoute()">Get Directions</button>
+
+                <div class="status-indicators">
+                    <div class="indicator"><span class="dot red"></span> Busy</div>
+                    <div class="indicator"><span class="dot orange"></span> Pothole</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. Traffic Report Page -->
+        <section id="traffic-report-page" class="page hidden center-content">
+            <div class="form-card glass-panel fade-in">
+                <h2><i class="fa-solid fa-camera"></i> Report Traffic</h2>
+
+                <div class="image-upload-area" onclick="triggerCamera('traffic-file')">
+                    <input type="file" id="traffic-file" accept="image/*" capture="environment" hidden
+                        onchange="previewImage(this, 'traffic-preview')">
+                    <div id="traffic-preview" class="preview-placeholder">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <p>Tap to Capture</p>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Location</label>
+                    <input type="text" id="traffic-location" placeholder="Fetching coordinates..." readonly>
+                </div>
+
+                <div class="input-group">
+                    <label>Stuck Duration (mins)</label>
+                    <input type="number" id="traffic-duration" placeholder="e.g. 15">
+                </div>
+
+                <button class="primary-btn full-width" onclick="submitReport('Traffic')">Submit Report</button>
+                <button class="text-btn" onclick="navigateTo('map-page')">Back to Map</button>
+            </div>
+        </section>
+
+        <!-- 4. Pothole Report Page -->
+        <section id="pothole-report-page" class="page hidden center-content">
+            <div class="form-card glass-panel fade-in">
+                <h2><i class="fa-solid fa-triangle-exclamation"></i> Report Pothole</h2>
+
+                <div class="image-upload-area" onclick="triggerCamera('pothole-file')">
+                    <input type="file" id="pothole-file" accept="image/*" capture="environment" hidden
+                        onchange="previewImage(this, 'pothole-preview')">
+                    <div id="pothole-preview" class="preview-placeholder">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <p>Tap to Capture</p>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Location</label>
+                    <input type="text" id="pothole-location" placeholder="Fetching coordinates..." readonly>
+                </div>
+
+                <div class="input-group">
+                    <label>Severity (1-10)</label>
+                    <input type="range" min="1" max="10" value="5" class="slider" id="pothole-severity">
+                </div>
+
+                <button class="primary-btn full-width" onclick="submitReport('Pothole')">Submit Report</button>
+                <button class="text-btn" onclick="navigateTo('map-page')">Back to Map</button>
+            </div>
+        </section>
+
+        <!-- 5. E-Challan Page -->
+        <section id="echalan-page" class="page hidden center-content">
+            <div class="form-card glass-panel fade-in">
+                <h2><i class="fa-solid fa-receipt"></i> E-Challan Check</h2>
+
+                <div class="input-group">
+                    <label>Vehicle Number / Name</label>
+                    <input type="text" id="echalan-input" placeholder="KA-01-AB-1234">
+                </div>
+
+                <button class="primary-btn full-width" onclick="checkChallan()">Check Status</button>
+
+                <div id="echalan-result" class="result-area hidden">
+                    <div class="challan-info">
+                        <p><strong>Amount:</strong> ₹<span id="challan-amount">500</span></p>
+                        <p><strong>Status:</strong> <span id="challan-status">Pending</span></p>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="success-btn" onclick="payChallan()">Pay Now</button>
+                    </div>
+                </div>
+                <button class="text-btn" onclick="navigateTo('map-page')">Back to Map</button>
+            </div>
+        </section>
+
+        <!-- 6. Admin Portal -->
+        <section id="admin-portal-page" class="page hidden">
+            <div class="admin-dashboard glass-panel fade-in">
+                <div class="admin-header">
+                    <h2>Admin Portal</h2>
+                    <button class="text-btn" onclick="navigateTo('map-page')">Exit</button>
+                </div>
+
+                <div class="admin-tabs">
+                    <button class="tab-btn active" onclick="switchAdminTab('reports')">Reports</button>
+                    <button class="tab-btn" onclick="switchAdminTab('challans')">E-Challans</button>
+                </div>
+
+                <div id="admin-reports-tab" class="admin-tab-content active">
+                    <h3>Add Report</h3>
+                    <div class="input-group">
+                        <select id="admin-report-type">
+                            <option value="traffic">Traffic</option>
+                            <option value="pothole">Pothole</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="admin-report-coords" placeholder="Lat, Lng">
+                    </div>
+                    <button class="primary-btn" onclick="adminAddReport()">Add to Map</button>
+                    <hr>
+                    <p>Recent User Reports:</p>
+                    <ul id="admin-reports-list" class="scroll-list">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+
+                <div id="admin-challans-tab" class="admin-tab-content hidden">
+                    <h3>Manage Challans</h3>
+                    <div class="input-group">
+                        <input type="text" id="admin-challan-plate" placeholder="Filter by Plate No.">
+                    </div>
+                    <ul id="admin-challans-list" class="scroll-list">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Main App Logic -->
+    <script src="app.js"></script>
+</body>
+
+</html>
