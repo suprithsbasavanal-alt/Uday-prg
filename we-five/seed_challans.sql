@@ -510,3 +510,4 @@ INSERT INTO challans (plate, owner, amount, status) VALUES
 ('KA-26-RW-2812', 'Rahul', 2000, 'Pending'),
 ('KA-54-MB-1654', 'Sunita', 100, 'Completed'),
 ('KA-68-PV-3149', 'Lakshmi', 2000, 'Pending');
+('KA-50-ME-8811', 'pavitra', 2000, 'Pending');
