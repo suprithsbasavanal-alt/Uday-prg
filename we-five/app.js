@@ -340,6 +340,7 @@ if (destInput) {
 }
 
 function fetchSuggestions(query) {
+    console.log("Fetching suggestions for:", query);
     // Base Query
     let searchQuery = query;
     if (!searchQuery.toLowerCase().includes("karnataka")) {

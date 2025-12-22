@@ -11,10 +11,20 @@ A real-time road safety capability application for Karnataka, featuring live tra
 
 ## Quick Start
 1. **Run the Server**:
+   You can use the provided script to start the server easily:
+   ```bash
+   ./start_server.sh
+   ```
+   Or manually:
    ```bash
    python3 -m http.server 8080
    ```
-2. **Open App**: [http://localhost:8080](http://localhost:8080)
+
+2. **Access the App**:
+   - **This Computer**: [http://localhost:8080](http://localhost:8080)
+   - **Other Devices (Same Wi-Fi)**: `http://10.211.56.227:8080`
+   
+   *Note: For mobile access, ensure your phone and computer are on the same Wi-Fi network.*
 
 ## Supabase Setup (Database)
 To make the E-Challan feature work, you must set up your Supabase project:
