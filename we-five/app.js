@@ -157,6 +157,9 @@ function detectLocation() {
                             if (road && city) name = `${road}, ${city}`;
                         }
 
+                        // Store for comparison in calculateRoute
+                        state.currentAddress = name;
+
                         locInput.value = name;
                         populateFormLocation(name);
                     })
@@ -184,42 +187,66 @@ function populateFormLocation(val) {
 
 async function calculateRoute() {
     const destInput = document.getElementById('destination');
+    const startInput = document.getElementById('current-location');
     const destQuery = destInput.value;
+    const startQuery = startInput.value;
 
     if (!destQuery) {
         showNotification("Please enter a destination!");
         return;
     }
 
-    if (!state.currentLocation) {
-        showNotification("Current location not found yet.");
+    if (!startQuery && !state.currentLocation) {
+        showNotification("Please enter a start location.");
         return;
     }
 
     showNotification("Calculating route...");
 
     try {
-        // 1. Geocode Destination with Context
-        let searchQuery = destQuery;
-        if (!searchQuery.toLowerCase().includes("karnataka")) {
-            searchQuery += ", Karnataka";
+        let startLat, startLng;
+
+        // 1. Determine Start Coordinates
+        // If the user hasn't changed the auto-detected text, use the cached GPS coords to save an API call
+        if (state.currentLocation && state.currentAddress && startQuery === state.currentAddress) {
+            startLat = state.currentLocation.lat;
+            startLng = state.currentLocation.lng;
+        } else {
+            // Geocode manual start location
+            // Bias towards Karnataka
+            let sQuery = startQuery;
+            if (!sQuery.toLowerCase().includes("karnataka")) sQuery += ", Karnataka";
+
+            const startGeoResp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(sQuery)}`);
+            const startGeoData = await startGeoResp.json();
+
+            if (!startGeoData || startGeoData.length === 0) {
+                showNotification("Start location not found.");
+                return;
+            }
+            startLat = parseFloat(startGeoData[0].lat);
+            startLng = parseFloat(startGeoData[0].lon);
+
+            // Respect Nominatim Rate Limit (1 req/sec)
+            await new Promise(r => setTimeout(r, 1100));
         }
 
-        const geoResp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`);
-        const geoData = await geoResp.json();
+        // 2. Geocode Destination
+        let dQuery = destQuery;
+        if (!dQuery.toLowerCase().includes("karnataka")) dQuery += ", Karnataka";
 
-        if (!geoData || geoData.length === 0) {
-            showNotification("Destination not found. Try a different name.");
+        const destGeoResp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(dQuery)}`);
+        const destGeoData = await destGeoResp.json();
+
+        if (!destGeoData || destGeoData.length === 0) {
+            showNotification("Destination not found.");
             return;
         }
 
-        const destLat = parseFloat(geoData[0].lat);
-        const destLng = parseFloat(geoData[0].lon);
+        const destLat = parseFloat(destGeoData[0].lat);
+        const destLng = parseFloat(destGeoData[0].lon);
 
-        // 2. Fetch Route from OSRM
-        const startLat = state.currentLocation.lat;
-        const startLng = state.currentLocation.lng;
-
+        // 3. Fetch Route from OSRM
         const routeResp = await fetch(`https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson`);
         const routeData = await routeResp.json();
 
@@ -230,16 +257,20 @@ async function calculateRoute() {
 
         const routeGeoJSON = routeData.routes[0].geometry;
 
-        // 3. Draw Route
+        // 4. Draw Route
         if (state.routeLayer) state.map.removeLayer(state.routeLayer);
 
         state.routeLayer = L.geoJSON(routeGeoJSON, {
             style: { color: '#4facfe', weight: 6, opacity: 0.8 }
         }).addTo(state.map);
 
-        // Add destination marker
+        // Add markers
+        // Clear old start marker if it differs from current GPS? 
+        // For simplicity, we just add the dest marker. Start marker is usually "You are here" or we can add one.
+        L.marker([startLat, startLng]).addTo(state.map).bindPopup("Start").openPopup();
+
         L.marker([destLat, destLng]).addTo(state.map)
-            .bindPopup(`<b>Destination:</b><br>${geoData[0].display_name}`).openPopup();
+            .bindPopup(`<b>Destination:</b><br>${destGeoData[0].display_name}`).openPopup();
 
         state.map.fitBounds(state.routeLayer.getBounds(), { padding: [50, 50] });
 
@@ -268,7 +299,7 @@ function previewImage(input, previewId) {
     }
 }
 
-function submitReport(type) {
+async function submitReport(type) {
     // 1. Validate
     const loc = type === 'Traffic' ? document.getElementById('traffic-location').value : document.getElementById('pothole-location').value;
 
@@ -289,27 +320,87 @@ function submitReport(type) {
         addMarkerToMap(type, lat, lng);
     }
 
-    // 3. Add to Admin List (State)
-    state.reports.push({
+    // 4. Copy Image to Clipboard
+    const fileId = type === 'Traffic' ? 'traffic-file' : 'pothole-file';
+    const fileInput = document.getElementById(fileId);
+    let clipboardMsg = "Please attach photo manually.";
+
+    if (fileInput.files && fileInput.files[0]) {
+        try {
+            // Write image to clipboard
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    [fileInput.files[0].type]: fileInput.files[0]
+                })
+            ]);
+            clipboardMsg = "Photo COPIED! Paste (Ctrl+V) in Gmail.";
+        } catch (err) {
+            console.error("Clipboard Error:", err);
+            clipboardMsg = "Could not copy photo. Please attach manually.";
+        }
+    }
+
+    // 5. Open Gmail for Report Submission
+    const subject = `Report: ${type} at ${loc}`;
+    const body = `To Traffic Authority,\n\nI would like to report ${type} at the following location:\n${loc}\n\nTimestamp: ${new Date().toLocaleString()}\n\n[PASTE YOUR PHOTO HERE (Ctrl+V)]\n\nRegards,\nConcerned Citizen`;
+
+    // Gmail Compose URL
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=traffic.report@karnataka.gov.in&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    console.log(`Redirecting to Gmail for report submission...`);
+    showNotification(clipboardMsg);
+
+    // Open in new tab
+    window.open(gmailUrl, '_blank');
+
+    // Store pending Data
+    pendingReportData = {
         type: type,
         location: loc, // string address
-        timestamp: new Date().toLocaleTimeString()
-    });
-    updateAdminReports();
+        timestamp: new Date().toLocaleTimeString(),
+        lat: lat,
+        lng: lng,
+        hasLocation: (state.currentLocation !== null)
+    };
 
-    // 4. Send "SMS/Email" simulation
-    const phone = '8310072492';
-    const email = 'suprithsbasavanal@gmail.com';
-
-    console.log(`Sending Report via SMS to ${phone} and Email to ${email}`);
-
-    showNotification(`Report Sent! SMS sent to ${phone}`);
-
-    // Simulate navigation back
+    // Show Confirmation Modal
     setTimeout(() => {
-        navigateTo('map-page');
-    }, 1500);
+        document.getElementById('confirmation-modal').classList.remove('hidden');
+    }, 1000);
 }
+
+// Global variable for pending report
+let pendingReportData = null;
+
+function resolveReportSubmission(submitted) {
+    document.getElementById('confirmation-modal').classList.add('hidden');
+
+    if (submitted && pendingReportData) {
+        // Add to Admin List (State)
+        state.reports.push({
+            type: pendingReportData.type,
+            location: pendingReportData.location,
+            timestamp: pendingReportData.timestamp
+        });
+        updateAdminReports();
+
+        // Add to Map if we have coords
+        if (pendingReportData.hasLocation) {
+            addMarkerToMap(pendingReportData.type, pendingReportData.lat, pendingReportData.lng);
+        }
+
+        showNotification("Report Successfully Logged!");
+    } else {
+        showNotification("Report Cancelled (Not Saved).");
+    }
+
+    // Reset
+    pendingReportData = null;
+
+    // Navigate Back
+    navigateTo('map-page');
+}
+
 
 // --- Autocomplete Logic ---
 let debounceTimer;
@@ -464,7 +555,7 @@ async function payChallan() {
 
         if (error) throw error;
 
-        showNotification(`Payment Successful! SMS sent to User.`);
+        showNotification(`Payment Successful! Receipt sent via Email.`);
         // Refresh UI
         document.getElementById('challan-status').innerText = 'Completed';
         document.getElementById('challan-status').style.color = '#10b981';
@@ -594,3 +685,5 @@ function showNotification(msg) {
         note.remove();
     }, 4000);
 }
+
+

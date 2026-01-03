@@ -27,6 +27,20 @@
     <!-- Notification Toast -->
     <div id="notification-container"></div>
 
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="modal-overlay hidden">
+        <div class="modal-content fade-in-up">
+            <h3 style="color: white;">Report Submitted?</h3>
+            <p style="margin: 15px 0; color: var(--text-muted);">Did you successfully send the email using Gmail?</p>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                <button class="primary-btn" onclick="resolveReportSubmission(true)" style="padding: 10px 20px;">Yes,
+                    Submitted</button>
+                <button class="text-btn" onclick="resolveReportSubmission(false)"
+                    style="margin-top:0; border: 1px solid var(--border-glass); padding: 10px 20px; border-radius: 12px; text-decoration: none; color: white;">No</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Navigation Menu (Top Left) -->
     <div id="menu-container" class="hidden">
         <button id="menu-btn" aria-label="Menu">
@@ -73,7 +87,8 @@
             <div class="map-controls glass-panel">
                 <h3>Live Navigation</h3>
                 <div class="input-group">
-                    <input type="text" id="current-location" placeholder="Detecting Location..." readonly>
+                    <input type="text" id="current-location"
+                        placeholder="Enter Start Location or Wait for Detection...">
                     <button class="icon-btn" onclick="detectLocation()"><i class="fa-solid fa-crosshairs"></i></button>
                 </div>
                 <div class="input-group">
